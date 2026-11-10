@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#12262b">
+  <title>Character Creator &amp; Spell Finder</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%2312262b'/%3E%3Cpath d='M8 3 13 12H3z' fill='none' stroke='%23d2a24c' stroke-width='1.6' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,500;0,700;1,500&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1 class="sr-only">Character Creator and Spell Finder</h1>
+
+  <header class="wrap app-header">
+    <label class="sr-only" for="char-switch">Character</label>
+    <select id="char-switch" class="who-select"></select>
+    <div id="who-sub" class="who-sub"></div>
+  </header>
+
+  <div id="banner" class="wrap banner-stack" aria-live="polite"></div>
+
+  <nav class="tabbar" aria-label="Sections">
+    <button type="button" class="tab" data-action="goto-tab" data-tab="character">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.8-4 3.6-6 7-6s6.2 2 7 6"/></svg>
+      <span>Character</span>
+    </button>
+    <button type="button" class="tab" data-action="goto-tab" data-tab="my-spells">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5c2.7-1 5.3-.8 8 1 2.7-1.8 5.3-2 8-1V19c-2.7-1-5.3-.8-8 1-2.7-1.8-5.3-2-8-1z"/><path d="M12 6.5V20"/></svg>
+      <span>My spells</span>
+    </button>
+    <button type="button" class="tab" data-action="goto-tab" data-tab="all-spells">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/></svg>
+      <span>All spells</span>
+    </button>
+    <button type="button" class="tab" data-action="goto-tab" data-tab="items">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8.5h12l1.2 11H4.8z"/><path d="M9 8.5V7a3 3 0 0 1 6 0v1.5"/></svg>
+      <span>Items</span>
+    </button>
+    <button type="button" class="tab" data-action="goto-tab" data-tab="more">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18.5" cy="12" r="1.4"/></svg>
+      <span>More</span>
+    </button>
+  </nav>
+
+  <main class="wrap">
+
+    <!-- ============================ Character ============================ -->
+    <section id="tab-character" class="panel" hidden>
+      <h2>Character</h2>
+
+      <div class="field">
+        <label for="char-name">Name</label>
+        <input id="char-name" type="text" maxlength="60" autocomplete="off" placeholder="Character name">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="char-level">Level</label>
+          <select id="char-level"></select>
+        </div>
+        <div class="field">
+          <label for="char-fp">Max FP</label>
+          <select id="char-fp"></select>
+        </div>
+        <div class="field">
+          <label for="char-hall">Hall or affiliation</label>
+          <select id="char-hall"></select>
+        </div>
+      </div>
+
+      <div class="group">
+        <h3>Elements</h3>
+        <div id="elements-list"></div>
+      </div>
+
+      <div class="group">
+        <h3>Core attributes</h3>
+        <div id="core-grid" class="core-grid"></div>
+      </div>
+
+      <p id="char-summary" class="summary"></p>
+      <p class="fine">Changes are saved on this device as you make them.</p>
+    </section>
+
+    <!-- ============================= My spells ============================= -->
+    <section id="tab-my-spells" class="panel" hidden>
+      <div class="fp" id="fp-bar">
+        <div class="fp-top">
+          <div class="fp-read">
+            <span class="fp-label">Focus points</span>
+            <span class="fp-value"><b id="fp-current">0</b><span class="fp-max">of <span id="fp-max">0</span></span></span>
+          </div>
+          <div class="fp-buttons">
+            <button type="button" class="btn square" id="fp-minus" data-action="fp" data-dir="-1" aria-label="Spend 1 focus point">&minus;</button>
+            <button type="button" class="btn square" id="fp-plus" data-action="fp" data-dir="1" aria-label="Recover 1 focus point">+</button>
+            <button type="button" class="btn" data-action="fp" data-dir="reset" aria-label="Refill focus points to the maximum">Refill</button>
+          </div>
+        </div>
+        <div class="ticks" id="fp-ticks" role="img"></div>
+      </div>
+
+      <div class="filters">
+        <input id="my-search" type="search" placeholder="Search my spells" aria-label="Search my spells" autocomplete="off">
+      </div>
+      <div id="my-list"></div>
+    </section>
+
+    <!-- ============================ All spells ============================ -->
+    <section id="tab-all-spells" class="panel" hidden>
+      <h2>All spells</h2>
+      <div class="filters">
+        <input id="all-search" type="search" placeholder="Search by name or description" aria-label="Search spells" autocomplete="off">
+        <div class="filter-row">
+          <select id="all-rarity" aria-label="Rarity"></select>
+          <select id="all-sort" aria-label="Sort order">
+            <option value="sheet">Sheet order</option>
+            <option value="az">A to Z</option>
+          </select>
+          <label class="check"><input type="checkbox" id="all-qualified"> Only spells I qualify for</label>
+        </div>
+        <p id="all-count" class="fine"></p>
+      </div>
+      <div id="all-list"></div>
+    </section>
+
+    <!-- ============================== Items ============================== -->
+    <section id="tab-items" class="panel" hidden>
+      <div class="panel-head">
+        <h2>Items</h2>
+        <button type="button" class="btn primary" id="open-item-dialog" data-action="open-item-dialog">Add item</button>
+      </div>
+      <div class="filters">
+        <input id="item-search" type="search" placeholder="Search my items" aria-label="Search my items" autocomplete="off">
+      </div>
+      <div id="items-list"></div>
+    </section>
+
+    <!-- =============================== More =============================== -->
+    <section id="tab-more" class="panel" hidden>
+      <h2>More</h2>
+
+      <div class="group">
+        <h3>Characters</h3>
+        <div id="more-characters"></div>
+        <div class="button-row">
+          <button type="button" class="btn primary" data-action="char-new">New character</button>
+          <button type="button" class="btn" data-action="char-duplicate">Duplicate current</button>
+          <button type="button" class="btn danger" data-action="char-delete">Delete current</button>
+        </div>
+        <p class="fine">Back up your characters, or move them to another phone or computer.</p>
+        <div class="button-row">
+          <button type="button" class="btn" data-action="export">Save backup file</button>
+          <button type="button" class="btn" data-action="import-click">Add from backup file</button>
+          <input type="file" id="import-file" accept=".json,application/json" hidden>
+        </div>
+      </div>
+
+      <div class="group">
+        <h3>Spell and item lists</h3>
+        <div id="more-data"></div>
+        <div class="button-row">
+          <button type="button" class="btn" data-action="reload-data">Reload lists</button>
+          <button type="button" class="btn" data-action="preview-click" data-kind="spells">Try a spell CSV from this device</button>
+          <button type="button" class="btn" data-action="preview-click" data-kind="items">Try an item CSV from this device</button>
+          <input type="file" id="preview-spells-file" accept=".csv,text/csv" hidden>
+          <input type="file" id="preview-items-file" accept=".csv,text/csv" hidden>
+        </div>
+        <p class="fine">Trying a CSV only changes what you see until you reload the page. Nothing is uploaded or saved.</p>
+      </div>
+
+      <div class="group">
+        <h3>Data check</h3>
+        <div id="more-issues"></div>
+      </div>
+
+      <p id="about" class="fine"></p>
+    </section>
+  </main>
+
+  <!-- ======================== Add item dialog ======================== -->
+  <dialog id="item-dialog" aria-labelledby="item-dialog-title">
+    <div class="dialog-head">
+      <h2 id="item-dialog-title">Add item</h2>
+      <button type="button" class="btn" data-action="close-dialog">Done</button>
+    </div>
+    <div class="dialog-body" id="item-dialog-body">
+      <div class="filters">
+        <input id="dialog-search" type="search" placeholder="Search the item list" aria-label="Search the item list" autocomplete="off">
+        <select id="dialog-type" aria-label="Item type"></select>
+      </div>
+      <p id="dialog-status" class="sr-only" role="status"></p>
+      <div id="catalog-list"></div>
+
+      <details class="custom" id="custom-details">
+        <summary>Add a custom item</summary>
+        <form id="custom-form" autocomplete="off">
+          <div class="field">
+            <label for="custom-name">Name</label>
+            <input id="custom-name" type="text" required maxlength="80">
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="custom-qty">Quantity</label>
+              <input id="custom-qty" type="number" min="1" max="999" value="1" inputmode="numeric">
+            </div>
+            <div class="field">
+              <label for="custom-type">Type (optional)</label>
+              <input id="custom-type" type="text" maxlength="40">
+            </div>
+            <div class="field">
+              <label for="custom-slot">Equip slot (optional)</label>
+              <input id="custom-slot" type="text" maxlength="40" placeholder="Leave blank if not equipped">
+            </div>
+          </div>
+          <div class="field">
+            <label for="custom-description">Description</label>
+            <textarea id="custom-description" rows="3" maxlength="600"></textarea>
+          </div>
+          <label class="check"><input type="checkbox" id="custom-consumable"> Consumable (adds a Use button)</label>
+          <div class="button-row">
+            <button type="submit" class="btn primary">Add custom item</button>
+          </div>
+          <p id="custom-status" class="fine" role="status"></p>
+        </form>
+      </details>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <button type="button" id="back-to-top" class="to-top" data-action="to-top" aria-label="Back to top">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 14 6-6 6 6"/></svg>
+  </button>
+
+  <script src="js/config.js"></script>
+  <script src="js/csv.js"></script>
+  <script src="js/requirements.js"></script>
+  <script src="js/catalog.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

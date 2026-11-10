@@ -1,0 +1,6 @@
+Item Name,Type,Rarity,Equip Slot,Consumable,Description,Effect,Value
+Example Healing Potion,Potion,Common,,Yes,"Example item. Replace this file with your own list of items.","Shown on the card as an extra detail (any extra column is shown automatically).",Example value
+Example Traveler's Cloak,Clothing,Common,Back,,"Example of something you can equip: it has an Equip Slot, so the card gets an Equip button.",,
+Example Ring of Focus,Accessory,Uncommon,Ring,,"Another equippable example. Each copy you add is tracked separately.",,
+Example Rope (50 ft),Gear,Common,,,"Example of plain gear: no Equip Slot and not Consumable, so it just has a quantity.",,
+Example Faez Crystal,Material,Rare,,Yes,"Example of a consumable: it has a Use button that spends one.",,
