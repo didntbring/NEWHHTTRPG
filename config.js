@@ -10,12 +10,12 @@
   HH.config = {
     APP_VERSION: '2.0.0',
 
-    // Where the spell and item lists are loaded from. Use a file in the data/ folder,
+    // Where the spell and item lists are loaded from. Use a file next to index.html,
     // or a full web address (for example a Google Sheet "published to the web" as CSV;
     // see README.md).
     DATA: {
-      spells: 'data/spells.csv',
-      items: 'data/items.csv',
+      spells: 'spells.csv',
+      items: 'items.csv',
     },
 
     // Choices in the Hall / Affiliation dropdown. (Informational only for now.)
