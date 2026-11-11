@@ -50,8 +50,51 @@
       learned: [],
       overrides: [],
       favorites: [],
+      maxHP: cfg().NUMBER_FIELDS.maxHP.start,
+      currentHP: cfg().NUMBER_FIELDS.maxHP.start,
+      tempHP: 0,
+      saveDC: null,
+      attackMod: null,
+      damageMod: null,
+      tags: [],
+      spellTags: {},
       inventory: [],
     }, partial || {});
+  }
+
+  // ---- tags (a tag is a name and a color; spells are linked to tags by name)
+  const tagKey = n => String(n).trim().toLowerCase();
+
+  function addTag(c, name, color) {
+    const clean = str(name).trim().slice(0, 24);
+    if (!clean) return null;
+    const existing = c.tags.find(t => tagKey(t.name) === tagKey(clean));
+    if (existing) return existing;
+    const tag = { name: clean, color: cfg().TAG_COLORS.some(x => x.key === color) ? color : 'slate' };
+    c.tags.push(tag);
+    return tag;
+  }
+  function deleteTag(c, name) {
+    const k = tagKey(name);
+    c.tags = c.tags.filter(t => tagKey(t.name) !== k);
+    Object.keys(c.spellTags).forEach(id => {
+      c.spellTags[id] = c.spellTags[id].filter(n => tagKey(n) !== k);
+      if (!c.spellTags[id].length) delete c.spellTags[id];
+    });
+  }
+  // Returns true if the spell now has the tag, false if the tag was taken off.
+  function toggleSpellTag(c, spellId, name) {
+    const tag = c.tags.find(t => tagKey(t.name) === tagKey(name));
+    if (!tag) return false;
+    const list = c.spellTags[spellId] || (c.spellTags[spellId] = []);
+    const i = list.findIndex(n => tagKey(n) === tagKey(name));
+    if (i >= 0) {
+      list.splice(i, 1);
+      if (!list.length) delete c.spellTags[spellId];
+      return false;
+    }
+    list.push(tag.name);
+    return true;
   }
 
   function sanitizeEntry(raw) {
@@ -97,6 +140,27 @@
     c.learned = strList(raw.learned);
     c.overrides = strList(raw.overrides);
     c.favorites = strList(raw.favorites);
+    c.maxHP = clamp(int(raw.maxHP, c.maxHP), R.hp);
+    c.currentHP = clamp(int(raw.currentHP, c.maxHP), [0, c.maxHP]);
+    c.tempHP = clamp(int(raw.tempHP, 0), R.temp);
+    ['saveDC', 'attackMod', 'damageMod'].forEach(k => {
+      const n = parseInt(raw[k], 10);
+      c[k] = Number.isFinite(n) ? clamp(n, R[k]) : null;
+    });
+    const colors = cfg().TAG_COLORS.map(x => x.key);
+    const seenTags = new Set();
+    c.tags = (Array.isArray(raw.tags) ? raw.tags : [])
+      .map(t => ({ name: str(t && t.name).trim().slice(0, 24), color: colors.includes(t && t.color) ? t.color : 'slate' }))
+      .filter(t => t.name && !seenTags.has(tagKey(t.name)) && seenTags.add(tagKey(t.name)));
+    c.spellTags = {};
+    if (raw.spellTags && typeof raw.spellTags === 'object') {
+      Object.keys(raw.spellTags).forEach(id => {
+        const names = [...new Set(strList(raw.spellTags[id])
+          .map(n => (c.tags.find(t => tagKey(t.name) === tagKey(n)) || {}).name)
+          .filter(Boolean))];
+        if (names.length) c.spellTags[id] = names;
+      });
+    }
     c.inventory = (Array.isArray(raw.inventory) ? raw.inventory : []).map(sanitizeEntry).filter(Boolean);
     return c;
   }
@@ -260,6 +324,9 @@
     }
   }
 
-  HH.storage = { createStore, browserBackend, newCharacter, sanitizeCharacter, readOldApp, uid, KEYS, OLD_KEYS };
+  HH.storage = {
+    createStore, browserBackend, newCharacter, sanitizeCharacter, readOldApp, uid, KEYS, OLD_KEYS,
+    addTag, deleteTag, toggleSpellTag, tagKey,
+  };
   if (typeof module !== 'undefined' && module.exports) module.exports = HH.storage;
 })();

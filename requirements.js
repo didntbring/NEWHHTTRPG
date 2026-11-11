@@ -167,6 +167,36 @@
     return { met: alternatives.some(a => a.met), alternatives };
   }
 
-  HH.requirements = { parse, evaluate };
+  // How far a character is from qualifying: the fewest points they would need to add
+  // across any option that can be checked automatically. Returns null when nothing about
+  // the requirement can be checked (for example a bare Hall name).
+  // { points: 0, steps: [] } means they already qualify.
+  function shortfall(parsed, character) {
+    if (parsed.none) return { points: 0, steps: [] };
+    if (evaluate(parsed, character).met) return { points: 0, steps: [] };
+    const elements = (character && character.elements) || {};
+    const stats = (character && character.stats) || {};
+    const value = key => Number(key in elements ? elements[key] : stats[key]) || 0;
+    const highest = Math.max(0, ...ELEMENTS.map(k => Number(elements[k]) || 0));
+    let best = null;
+    parsed.alternatives.forEach(alt => {
+      if (alt.terms.some(t => t.kind === 'named')) return;
+      const steps = [];
+      alt.terms.forEach(t => {
+        const have = t.kind === 'any' ? highest : value(t.key);
+        if (have >= t.min) return;
+        const label = t.kind === 'any' ? 'Any element'
+          : ELEMENTS.includes(t.key) ? titleCase(t.key) : t.key.toUpperCase();
+        steps.push({ key: t.kind === 'any' ? 'any' : t.key, label, have, need: t.min, gap: t.min - have });
+      });
+      const points = steps.reduce((n, s) => n + s.gap, 0);
+      if (!best || points < best.points || (points === best.points && steps.length < best.steps.length)) {
+        best = { points, steps };
+      }
+    });
+    return best;
+  }
+
+  HH.requirements = { parse, evaluate, shortfall };
   if (typeof module !== 'undefined' && module.exports) module.exports = HH.requirements;
 })();

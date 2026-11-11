@@ -19,6 +19,7 @@
     duration: ['duration'],
     description: ['description'],
     escalation: ['escalation', 'escalate'],
+    tags: ['tags', 'tag'],
     rarity: ['rarity'],
     id: ['id'],
   };
@@ -52,6 +53,68 @@
 
   // The stable key that characters use to remember a spell or item.
   const makeId = nameOrId => slug(stripRarityTag(nameOrId));
+
+  const COMBO_FIELDS = {
+    name: ['combo name', 'name', 'combo'],
+    spells: ['spells', 'spell list', 'spells in combo'],
+    description: ['description', 'how it works', 'notes', 'effect'],
+    id: ['id'],
+  };
+
+  // ------------------------------------------------ facts used by the filters
+  const ELEMENT_KEYS = ['fire', 'air', 'spirit', 'earth', 'water'];
+
+  const LABELS = {
+    cast: { action: 'Action', bonus: 'Bonus action', reaction: 'Reaction', long: 'Takes longer', other: 'Not listed' },
+    range: { self: 'Self', touch: 'Touch', ranged: 'Ranged', other: 'Other' },
+    dur: { instant: 'Instant', concentration: 'Concentration', lasting: 'Lasting', other: 'Not listed' },
+    fp: { free: 'Free', '1': '1 FP', '2': '2 FP', '3': '3 FP', '4+': '4 or more', varies: 'Varies' },
+  };
+
+  function castKey(text) {
+    const s = String(text).trim().toLowerCase();
+    if (!s) return 'other';
+    if (/bonus/.test(s)) return 'bonus';
+    if (/reaction/.test(s)) return 'reaction';
+    if (/^(1\s+)?action$/.test(s)) return 'action';
+    return 'long';
+  }
+  function rangeKey(text) {
+    const s = String(text).trim().toLowerCase();
+    if (/^self/.test(s)) return 'self';
+    if (/touch/.test(s)) return 'touch';
+    if (/^\d|\b(feet|foot|ft|mile)\b|[’']/.test(s)) return 'ranged';
+    return 'other';
+  }
+  function durKey(text) {
+    const s = String(text).trim().toLowerCase();
+    if (/concentration/.test(s)) return 'concentration';
+    if (/^instant/.test(s)) return 'instant';
+    return s ? 'lasting' : 'other';
+  }
+  // "2" -> 2; "4 + 1 per mage" -> 4 and "varies"; blank -> unknown
+  function fpInfo(text) {
+    const s = String(text).trim();
+    if (/^\d+$/.test(s)) return { fpNum: parseInt(s, 10), fpVaries: false };
+    const m = s.match(/^(\d+)/);
+    return m ? { fpNum: parseInt(m[1], 10), fpVaries: true } : { fpNum: null, fpVaries: false };
+  }
+  function elementsIn(req) {
+    const found = [];
+    req.alternatives.forEach(alt => alt.terms.forEach(t => {
+      if (t.kind === 'stat' && ELEMENT_KEYS.includes(t.key) && !found.includes(t.key)) found.push(t.key);
+    }));
+    return found;
+  }
+  // "Damage; Fire" -> ["Damage", "Fire"]
+  function splitTags(text) {
+    const out = [];
+    String(text || '').split(/\s*[;|]\s*/).forEach(raw => {
+      const t = raw.trim().slice(0, 24);
+      if (t && !out.some(x => x.toLowerCase() === t.toLowerCase())) out.push(t);
+    });
+    return out;
+  }
 
   function mapColumns(headers, fieldMap) {
     const index = {};
@@ -171,6 +234,13 @@
         escalation,
         rarity: titleWord(rarityKey),
         rarityKey,
+        castKey: castKey(cell('castTime')),
+        rangeKey: rangeKey(cell('range')),
+        durKey: durKey(cell('duration')),
+        elements: elementsIn(req),
+        tags: splitTags(cell('tags')),
+        fpNum: fpInfo(fpCost).fpNum,
+        fpVaries: fpInfo(fpCost).fpVaries,
         extras: extras
           .map(e => ({ label: e.label, value: rec.cells[e.index] || '' }))
           .filter(e => e.value),
@@ -261,6 +331,63 @@
     return { items, issues, extraColumns: extras.map(e => e.label) };
   }
 
-  HH.catalog = { normalizeSpells, normalizeItems, makeId, stripRarityTag, slug, splitEscalation };
+  // ---------------------------------------------------------------- combos
+  // spellsById: a Map of the spells that were loaded (from normalizeSpells).
+  function normalizeCombos(parsedCsv, spellsById) {
+    const issues = [];
+    const combos = [];
+    const { index, extras } = mapColumns(parsedCsv.headers, COMBO_FIELDS);
+
+    if (!('name' in index) || !('spells' in index)) {
+      issues.push({ level: 'error', row: 1, message: 'The combo list needs a "Combo Name" column and a "Spells" column.' });
+      return { combos, issues, extraColumns: [] };
+    }
+
+    const taken = new Set();
+    parsedCsv.records.forEach(rec => {
+      const cell = field => (field in index ? rec.cells[index[field]] || '' : '');
+      const name = cell('name');
+      if (!name) {
+        issues.push({ level: 'error', row: rec.row, message: 'A row has no combo name, so it was skipped.' });
+        return;
+      }
+      const ids = [];
+      const unknown = [];
+      cell('spells').split(/\s*(?:;|\||\n|\s\+\s)\s*/).map(s => s.trim()).filter(Boolean).forEach(n => {
+        const id = makeId(n);
+        if (spellsById.has(id)) { if (!ids.includes(id)) ids.push(id); }
+        else unknown.push(n);
+      });
+      if (unknown.length) {
+        issues.push({
+          level: 'warning', row: rec.row,
+          message: `"${name}" lists ${unknown.map(u => `"${u}"`).join(', ')}, which ${unknown.length === 1 ? "isn't" : "aren't"} in the spell list. Check the spelling.`,
+        });
+      }
+      if (ids.length < 2) {
+        issues.push({ level: 'warning', row: rec.row, message: `"${name}" needs at least two spells from the spell list, so it was skipped.` });
+        return;
+      }
+      const id = uniqueId(makeId(cell('id') || name), taken, `combo-${rec.row}`);
+      taken.add(id);
+      combos.push({
+        id,
+        row: rec.row,
+        name,
+        spellIds: ids,
+        description: cell('description'),
+        extras: extras
+          .map(e => ({ label: e.label, value: rec.cells[e.index] || '' }))
+          .filter(e => e.value),
+      });
+    });
+
+    if (extras.length) {
+      issues.push({ level: 'info', row: null, message: `Extra columns shown on combo cards: ${extras.map(e => e.label).join(', ')}.` });
+    }
+    return { combos, issues, extraColumns: extras.map(e => e.label) };
+  }
+
+  HH.catalog = { normalizeSpells, normalizeItems, normalizeCombos, makeId, stripRarityTag, slug, splitEscalation, splitTags, LABELS };
   if (typeof module !== 'undefined' && module.exports) module.exports = HH.catalog;
 })();

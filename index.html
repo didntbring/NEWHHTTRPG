@@ -15,12 +15,26 @@
   <h1 class="sr-only">Character Creator and Spell Finder</h1>
 
   <header class="wrap app-header">
-    <label class="sr-only" for="char-switch">Character</label>
-    <select id="char-switch" class="who-select"></select>
+    <div class="header-row">
+      <div>
+        <label class="sr-only" for="char-switch">Character</label>
+        <select id="char-switch" class="who-select"></select>
+      </div>
+      <button type="button" class="btn dice-btn" data-action="open-dice" aria-label="Open the dice roller">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8 20 7.4v9.2l-8 4.6-8-4.6V7.4z"/><path d="M12 2.8v8.4m0 0-8 5.4m8-5.4 8 5.4M4 7.4l8 3.8 8-3.8"/></svg>
+        <span>Dice</span>
+      </button>
+    </div>
     <div id="who-sub" class="who-sub"></div>
   </header>
 
   <div id="banner" class="wrap banner-stack" aria-live="polite"></div>
+
+  <!-- Compact health and focus readout that appears when the full panel scrolls away -->
+  <button type="button" id="vitals-mini" class="vitals-mini" data-action="to-top" hidden aria-label="Hit points, focus points and spell numbers. Tap to go back to the top.">
+    <span class="vm-row"><span>HP <b id="vm-hp"></b></span><span>FP <b id="vm-fp"></b></span></span>
+    <span class="vm-row vm-stats"><span>Save DC <b id="vm-dc"></b></span><span>Attack <b id="vm-atk"></b></span><span>Damage <b id="vm-dmg"></b></span></span>
+  </button>
 
   <nav class="tabbar" aria-label="Sections">
     <button type="button" class="tab" data-action="goto-tab" data-tab="character">
@@ -71,6 +85,18 @@
       </div>
 
       <div class="group">
+        <h3>Health</h3>
+        <div id="health-fields" class="core-grid"></div>
+        <p class="fine">Your current health is tracked on the My spells tab.</p>
+      </div>
+
+      <div class="group">
+        <h3>Spell numbers</h3>
+        <div id="number-fields" class="core-grid wide"></div>
+        <p class="fine">These show at the top of My spells. Leave one blank if you don't have it yet.</p>
+      </div>
+
+      <div class="group">
         <h3>Elements</h3>
         <div id="elements-list"></div>
       </div>
@@ -86,23 +112,66 @@
 
     <!-- ============================= My spells ============================= -->
     <section id="tab-my-spells" class="panel" hidden>
-      <div class="fp" id="fp-bar">
-        <div class="fp-top">
-          <div class="fp-read">
-            <span class="fp-label">Focus points</span>
-            <span class="fp-value"><b id="fp-current">0</b><span class="fp-max">of <span id="fp-max">0</span></span></span>
+      <div class="vitals" id="vitals">
+        <div class="vital" id="hp-block">
+          <div class="vital-top">
+            <div class="vital-read">
+              <span class="vital-label">Hit points</span>
+              <span class="vital-value">
+                <b id="hp-current">0</b><span class="vital-max">of <span id="hp-max">0</span></span>
+                <span class="temp-chip" id="hp-temp-chip" hidden>+<span id="hp-temp">0</span> temp
+                  <button type="button" class="chip-x" data-action="hp" data-dir="clear-temp" aria-label="Clear temporary hit points">&times;</button>
+                </span>
+              </span>
+            </div>
           </div>
-          <div class="fp-buttons">
-            <button type="button" class="btn square" id="fp-minus" data-action="fp" data-dir="-1" aria-label="Spend 1 focus point">&minus;</button>
-            <button type="button" class="btn square" id="fp-plus" data-action="fp" data-dir="1" aria-label="Recover 1 focus point">+</button>
-            <button type="button" class="btn" data-action="fp" data-dir="reset" aria-label="Refill focus points to the maximum">Refill</button>
+          <div class="bar" id="hp-bar" role="img"><i id="hp-fill"></i></div>
+          <div class="hp-controls">
+            <label class="sr-only" for="hp-amount">Amount</label>
+            <input id="hp-amount" type="text" inputmode="numeric" pattern="[0-9]*" value="1" autocomplete="off">
+            <button type="button" class="btn danger" data-action="hp" data-dir="damage">Damage</button>
+            <button type="button" class="btn" data-action="hp" data-dir="heal">Heal</button>
+            <button type="button" class="btn" data-action="hp" data-dir="temp">Add temp</button>
           </div>
         </div>
-        <div class="ticks" id="fp-ticks" role="img"></div>
+
+        <div class="vital" id="fp-bar">
+          <div class="vital-top">
+            <div class="vital-read">
+              <span class="vital-label">Focus points</span>
+              <span class="vital-value"><b id="fp-current">0</b><span class="vital-max">of <span id="fp-max">0</span></span></span>
+            </div>
+            <div class="fp-buttons">
+              <button type="button" class="btn square" id="fp-minus" data-action="fp" data-dir="-1" aria-label="Spend 1 focus point">&minus;</button>
+              <button type="button" class="btn square" id="fp-plus" data-action="fp" data-dir="1" aria-label="Recover 1 focus point">+</button>
+              <button type="button" class="btn" data-action="fp" data-dir="reset" aria-label="Refill focus points to the maximum">Refill</button>
+            </div>
+          </div>
+          <div class="ticks" id="fp-ticks" role="img"></div>
+        </div>
+
+        <dl class="numbers">
+          <div class="num"><dt>Spell Save DC</dt><dd id="num-dc">&mdash;</dd></div>
+          <div class="num"><dt>Spell Attack Modifier</dt><dd id="num-atk">&mdash;</dd></div>
+          <div class="num"><dt>Single Target Spell Damage Modifier</dt><dd id="num-dmg">&mdash;</dd></div>
+        </dl>
+        <div class="vitals-foot">
+          <button type="button" class="btn small" data-action="rest">Full rest</button>
+          <span class="fine">Refills hit points and focus points, and clears temporary hit points.</span>
+        </div>
       </div>
 
       <div class="filters">
         <input id="my-search" type="search" placeholder="Search my spells" aria-label="Search my spells" autocomplete="off">
+        <div class="filter-row">
+          <button type="button" class="btn small" id="mf-toggle" data-action="mf-panel" aria-expanded="false" aria-controls="mf-panel">Filters</button>
+          <select id="mf-group" aria-label="Group spells by">
+            <option value="status">Group: ready or not</option>
+            <option value="tag">Group: tag</option>
+            <option value="cast">Group: cast time</option>
+          </select>
+        </div>
+        <div id="mf-panel" class="mf-panel" hidden></div>
       </div>
       <div id="my-list"></div>
     </section>
@@ -110,19 +179,43 @@
     <!-- ============================ All spells ============================ -->
     <section id="tab-all-spells" class="panel" hidden>
       <h2>All spells</h2>
-      <div class="filters">
-        <input id="all-search" type="search" placeholder="Search by name or description" aria-label="Search spells" autocomplete="off">
-        <div class="filter-row">
-          <select id="all-rarity" aria-label="Rarity"></select>
-          <select id="all-sort" aria-label="Sort order">
-            <option value="sheet">Sheet order</option>
-            <option value="az">A to Z</option>
-          </select>
-          <label class="check"><input type="checkbox" id="all-qualified"> Only spells I qualify for</label>
-        </div>
-        <p id="all-count" class="fine"></p>
+      <div class="seg" role="group" aria-label="What to show">
+        <button type="button" class="btn small" data-action="all-view" data-view="spells" aria-pressed="true">Spells</button>
+        <button type="button" class="btn small" data-action="all-view" data-view="combos" aria-pressed="false">Combos</button>
       </div>
-      <div id="all-list"></div>
+
+      <div id="all-spells-view">
+        <div class="filters">
+          <input id="all-search" type="search" placeholder="Search by name or description" aria-label="Search spells" autocomplete="off">
+          <div class="filter-row">
+            <select id="all-rarity" aria-label="Rarity"></select>
+            <select id="all-sort" aria-label="Sort order">
+              <option value="sheet">Sheet order</option>
+              <option value="az">A to Z</option>
+            </select>
+          </div>
+          <div class="filter-row">
+            <label class="check"><input type="checkbox" id="all-qualified"> Only spells I qualify for</label>
+            <label class="check"><input type="checkbox" id="all-near"> Show spells I'm close to first</label>
+          </div>
+          <label class="inline-select" id="near-range-wrap">Close means within
+            <select id="all-near-range" aria-label="How close counts as close"></select>
+          </label>
+          <p id="all-count" class="fine"></p>
+        </div>
+        <div id="all-list"></div>
+      </div>
+
+      <div id="all-combos-view" hidden>
+        <p class="fine">Spell combinations from your combo list, with how close this character is to using each one.</p>
+        <div class="filters">
+          <label class="check"><input type="checkbox" id="combo-soon"> Only combos I could use soon</label>
+          <label class="inline-select">Close means within
+            <select id="combo-near-range" aria-label="How close counts as close"></select>
+          </label>
+        </div>
+        <div id="combo-list"></div>
+      </div>
     </section>
 
     <!-- ============================== Items ============================== -->
@@ -158,14 +251,33 @@
       </div>
 
       <div class="group">
-        <h3>Spell and item lists</h3>
+        <h3>Tags for this character</h3>
+        <div id="more-tags"></div>
+        <form id="tag-form" class="tag-form" autocomplete="off">
+          <div class="field">
+            <label for="new-tag-name">New tag</label>
+            <input id="new-tag-name" type="text" maxlength="24" placeholder="Healing, Damage, Utility">
+          </div>
+          <div class="field">
+            <label for="new-tag-color">Color</label>
+            <select id="new-tag-color"></select>
+          </div>
+          <button type="submit" class="btn primary">Add tag</button>
+        </form>
+        <p class="fine">Give a spell tags from its card on My spells. Tags can also come from an optional Tags column in your spell list.</p>
+      </div>
+
+      <div class="group">
+        <h3>Spell, item and combo lists</h3>
         <div id="more-data"></div>
         <div class="button-row">
           <button type="button" class="btn" data-action="reload-data">Reload lists</button>
           <button type="button" class="btn" data-action="preview-click" data-kind="spells">Try a spell CSV from this device</button>
           <button type="button" class="btn" data-action="preview-click" data-kind="items">Try an item CSV from this device</button>
+          <button type="button" class="btn" data-action="preview-click" data-kind="combos">Try a combo CSV from this device</button>
           <input type="file" id="preview-spells-file" accept=".csv,text/csv" hidden>
           <input type="file" id="preview-items-file" accept=".csv,text/csv" hidden>
+          <input type="file" id="preview-combos-file" accept=".csv,text/csv" hidden>
         </div>
         <p class="fine">Trying a CSV only changes what you see until you reload the page. Nothing is uploaded or saved.</p>
       </div>
@@ -228,17 +340,54 @@
     </div>
   </dialog>
 
+  <!-- =========================== Tag dialog =========================== -->
+  <dialog id="tag-dialog" aria-labelledby="tag-dialog-title">
+    <div class="dialog-head">
+      <h2 id="tag-dialog-title">Tags</h2>
+      <button type="button" class="btn" data-action="close-tag-dialog">Done</button>
+    </div>
+    <div class="dialog-body" id="tag-dialog-body"></div>
+  </dialog>
+
+  <!-- =========================== Dice dialog =========================== -->
+  <dialog id="dice-dialog" aria-labelledby="dice-title">
+    <div class="dialog-head">
+      <h2 id="dice-title">Dice</h2>
+      <button type="button" class="btn" data-action="close-dice">Done</button>
+    </div>
+    <div class="dialog-body">
+      <div id="dice-rows"></div>
+      <div class="dice-mod">
+        <label for="dice-mod">Modifier</label>
+        <div class="stepper">
+          <button type="button" class="step" data-action="dice-mod" data-delta="-1" aria-label="Lower the modifier">&minus;</button>
+          <input id="dice-mod" type="text" inputmode="numeric" value="0" autocomplete="off">
+          <button type="button" class="step" data-action="dice-mod" data-delta="1" aria-label="Raise the modifier">+</button>
+        </div>
+        <div class="mod-presets" id="dice-presets"></div>
+      </div>
+      <div class="button-row">
+        <button type="button" class="btn primary roll-btn" data-action="dice-roll">Roll</button>
+        <button type="button" class="btn" data-action="dice-reset">Clear dice</button>
+      </div>
+      <div id="dice-result" class="dice-result" role="status" aria-live="polite"></div>
+      <div id="dice-history"></div>
+    </div>
+  </dialog>
+
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <button type="button" id="back-to-top" class="to-top" data-action="to-top" aria-label="Back to top">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 14 6-6 6 6"/></svg>
   </button>
 
   <script src="config.js"></script>
+  <script src="defaults.js"></script>
   <script src="csv.js"></script>
   <script src="requirements.js"></script>
   <script src="catalog.js"></script>
+  <script src="dice.js"></script>
+  <script src="logic.js"></script>
   <script src="storage.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
-
