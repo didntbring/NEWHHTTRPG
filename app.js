@@ -52,7 +52,7 @@
     itemSearch: '', dialogSearch: '', dialogType: '',
     dice: { counts: {}, history: [] },
     tagSpellId: null,
-    vitalsVisible: true,
+    vitalsVisible: true, vCompact: false, vPinned: false,
     warnedStorage: false,
   };
   const active = () => state.store.active();
@@ -349,7 +349,19 @@
     renderHeader();
   }
   function updateMini() {
-    $('#vitals-mini').hidden = !(state.tab === 'my-spells' && !state.vitalsVisible);
+    $('#vitals-mini').hidden = !(state.tab === 'my-spells' && !state.vitalsVisible && !state.vPinned);
+  }
+  function applyVitalsView() {
+    const v = $('#vitals');
+    v.classList.toggle('compact', state.vCompact);
+    v.classList.toggle('pinned', state.vPinned);
+    const c = $('#vitals-collapse');
+    c.setAttribute('aria-pressed', String(state.vCompact));
+    c.textContent = state.vCompact ? 'Show details' : 'Compact view';
+    const p = $('#vitals-pin');
+    p.setAttribute('aria-pressed', String(state.vPinned));
+    p.textContent = state.vPinned ? 'Pinned to top' : 'Pin to top';
+    document.documentElement.style.setProperty('--sticky-top', '0px');
   }
   function setFP(value) {
     const c = active();
@@ -1242,6 +1254,16 @@
     },
     hp: el => hpAction(el.dataset.dir),
     rest: () => fullRest(),
+    'vitals-collapse': () => {
+      state.vCompact = !state.vCompact;
+      state.store.setUI({ vCompact: state.vCompact });
+      applyVitalsView();
+    },
+    'vitals-pin': () => {
+      state.vPinned = !state.vPinned;
+      state.store.setUI({ vPinned: state.vPinned });
+      applyVitalsView();
+    },
     step: el => {
       const c = active();
       const key = el.dataset.stat;
@@ -1580,9 +1602,12 @@
     if (['status', 'tag', 'cast'].includes(ui.groupBy)) state.groupBy = ui.groupBy;
     if (typeof ui.allNear === 'boolean') state.allNear = ui.allNear;
     if (C.NEAR_CHOICES.includes(ui.nearLimit)) state.nearLimit = ui.nearLimit;
+    state.vCompact = ui.vCompact === true;
+    state.vPinned = ui.vPinned === true;
 
     buildCharacterForm();
     buildNearSelects();
+    applyVitalsView();
     wire();
     renderHeader();
     renderBanners();

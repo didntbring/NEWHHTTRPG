@@ -113,7 +113,11 @@
     <!-- ============================= My spells ============================= -->
     <section id="tab-my-spells" class="panel" hidden>
       <div class="vitals" id="vitals">
-        <div class="vital" id="hp-block">
+        <div class="vitals-bar">
+          <button type="button" class="btn small" id="vitals-collapse" data-action="vitals-collapse" aria-pressed="false" aria-controls="vitals">Compact view</button>
+          <button type="button" class="btn small" id="vitals-pin" data-action="vitals-pin" aria-pressed="false">Pin to top</button>
+        </div>
+        <div class="vital" id="hp-block" data-short="HP">
           <div class="vital-top">
             <div class="vital-read">
               <span class="vital-label">Hit points</span>
@@ -135,7 +139,7 @@
           </div>
         </div>
 
-        <div class="vital" id="fp-bar">
+        <div class="vital" id="fp-bar" data-short="FP">
           <div class="vital-top">
             <div class="vital-read">
               <span class="vital-label">Focus points</span>
@@ -151,9 +155,9 @@
         </div>
 
         <dl class="numbers">
-          <div class="num"><dt>Spell Save DC</dt><dd id="num-dc">&mdash;</dd></div>
-          <div class="num"><dt>Spell Attack Modifier</dt><dd id="num-atk">&mdash;</dd></div>
-          <div class="num"><dt>Single Target Spell Damage Modifier</dt><dd id="num-dmg">&mdash;</dd></div>
+          <div class="num" data-short="Save DC"><dt>Spell Save DC</dt><dd id="num-dc">&mdash;</dd></div>
+          <div class="num" data-short="Attack"><dt>Spell Attack Modifier</dt><dd id="num-atk">&mdash;</dd></div>
+          <div class="num" data-short="Damage"><dt>Single Target Spell Damage Modifier</dt><dd id="num-dmg">&mdash;</dd></div>
         </dl>
         <div class="vitals-foot">
           <button type="button" class="btn small" data-action="rest">Full rest</button>

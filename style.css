@@ -578,3 +578,35 @@ dialog::backdrop { background: rgba(5, 12, 14, 0.75); }
 .roll-btn { flex: 1; font-size: 18px; }
 .vm-row { display: inline-flex; gap: 16px; }
 .vitals-mini .vm-row + .vm-row { margin-left: 0; }
+
+/* ---- Version 2.2: compact + pinned vitals, no double-tap zoom ---- */
+html, body, button, input, select, textarea, label, a, [data-action] { touch-action: manipulation; }
+input, select, textarea { font-size: max(16px, 1em); }
+
+.vitals-bar { display: flex; justify-content: flex-end; gap: 8px; }
+.vitals.pinned {
+  position: sticky; top: 0; z-index: 20;
+  background: var(--night);
+  margin: 0 -16px; padding-left: 16px; padding-right: 16px;
+  padding-top: calc(8px + env(safe-area-inset-top));
+}
+
+.vitals.compact { grid-template-columns: 1fr 1fr; gap: 8px 14px; padding: 8px 0 10px; }
+.vitals.compact .vitals-bar { grid-column: 1 / -1; }
+.vitals.compact .vital { gap: 6px; }
+.vitals.compact .vital-label, .vitals.compact .vitals-foot, .vitals.compact .hp-controls,
+.vitals.compact .fp-buttons, .vitals.compact .num dt { display: none; }
+.vitals.compact .vital-top::before { content: attr(data-short); }
+.vitals.compact .vital::before {
+  content: attr(data-short); font-size: 12.5px; font-weight: 700; color: var(--text-dim); line-height: 1;
+}
+.vitals.compact .vital-value b { font-size: 28px; }
+.vitals.compact .vital-max { font-size: 16px; }
+.vitals.compact .vital-top::before { content: none; }
+.vitals.compact .bar { height: 8px; }
+.vitals.compact .ticks { margin-top: 0; height: 8px; }
+.vitals.compact .numbers { grid-column: 1 / -1; gap: 6px; }
+.vitals.compact .num { padding: 4px 6px; display: flex; align-items: baseline; justify-content: center; gap: 6px; }
+.vitals.compact .num::before { content: attr(data-short); font-size: 12px; color: var(--text-dim); order: 0; }
+.vitals.compact .num dd { font-size: 20px; order: 1; }
+.vitals.pinned, .vitals.pinned.compact { padding-left: 16px; padding-right: 16px; }
