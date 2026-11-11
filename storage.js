@@ -58,6 +58,10 @@
       damageMod: null,
       tags: [],
       spellTags: {},
+      playerName: '', race: '', xp: '',
+      ac: null, speed: null, initBonus: 0, profOverride: null,
+      saveProf: {}, saveOverride: {}, skillProf: {}, skillOverride: {},
+      combat: [], combatNotes: '', background: '', classInfo: '', otherNotes: '',
       inventory: [],
     }, partial || {});
   }
@@ -97,6 +101,44 @@
     return true;
   }
 
+  const text = v => str(v).slice(0, (cfg().SHEET_TEXT_MAX || 4000));
+  const optInt = (v, range) => { const n = parseInt(v, 10); return Number.isFinite(n) ? clamp(n, range) : null; };
+  function profMap(raw, keys) {
+    const out = {};
+    keys.forEach(k => { const n = raw && raw[k] != null ? int(raw[k], 0) : 0; if (n > 0) out[k] = Math.min(2, n); });
+    return out;
+  }
+  function overrideMap(raw, keys) {
+    const out = {};
+    keys.forEach(k => { const n = raw && raw[k] != null && raw[k] !== '' ? parseInt(raw[k], 10) : NaN; if (Number.isFinite(n)) out[k] = clamp(n, [-30, 60]); });
+    return out;
+  }
+  // The character-sheet fields.
+  function sanitizeSheet(c, raw) {
+    const R = cfg().RANGES;
+    const skillKeys = cfg().SKILLS.map(s => s.key);
+    c.playerName = str(raw.playerName).slice(0, 60);
+    c.race = str(raw.race).slice(0, 60);
+    c.xp = str(raw.xp).slice(0, 20);
+    c.ac = optInt(raw.ac, R.ac);
+    c.speed = optInt(raw.speed, R.speed);
+    c.initBonus = clamp(int(raw.initBonus, 0), R.bonus);
+    c.profOverride = optInt(raw.profOverride, [0, 20]);
+    c.saveProf = profMap(raw.saveProf, cfg().CORE_STATS);
+    c.saveOverride = overrideMap(raw.saveOverride, cfg().CORE_STATS);
+    c.skillProf = profMap(raw.skillProf, skillKeys);
+    c.skillOverride = overrideMap(raw.skillOverride, skillKeys);
+    c.combat = (Array.isArray(raw.combat) ? raw.combat : []).slice(0, cfg().COMBAT_ROWS_MAX || 30).map(r => ({
+      id: str(r && r.id) || uid(),
+      item: str(r && r.item).slice(0, 80), atk: str(r && r.atk).slice(0, 20),
+      dmg: str(r && r.dmg).slice(0, 40), other: str(r && r.other).slice(0, 120),
+    }));
+    c.combatNotes = text(raw.combatNotes);
+    c.background = text(raw.background);
+    c.classInfo = text(raw.classInfo);
+    c.otherNotes = text(raw.otherNotes);
+  }
+
   function sanitizeEntry(raw) {
     if (!raw || typeof raw !== 'object') return null;
     const itemId = raw.itemId ? str(raw.itemId) : null;
@@ -108,6 +150,7 @@
       name,
       qty: clamp(int(raw.qty, 1), [1, 999]),
       equipped: !!raw.equipped,
+      slots: strList(raw.slots).slice(0, 4).map(x => x.slice(0, 24)),
       custom: null,
     };
     if (!itemId) {
@@ -162,6 +205,13 @@
       });
     }
     c.inventory = (Array.isArray(raw.inventory) ? raw.inventory : []).map(sanitizeEntry).filter(Boolean);
+    // An item in a slot is equipped. One slot holds one item.
+    const taken = new Set();
+    c.inventory.forEach(e => {
+      e.slots = e.slots.filter(sl => !taken.has(sl) && taken.add(sl));
+      if (e.slots.length) e.equipped = true;
+    });
+    sanitizeSheet(c, raw);
     return c;
   }
 

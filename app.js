@@ -346,7 +346,47 @@
     $('#vm-dc').textContent = c.saveDC == null ? '—' : c.saveDC;
     $('#vm-atk').textContent = signed(c.attackMod);
     $('#vm-dmg').textContent = signed(c.damageMod);
+    updateQuick();
     renderHeader();
+  }
+  // The health and focus window you can open from the header on any screen.
+  function openQuick() {
+    const c = active();
+    $('#quick-body').innerHTML = `
+      <div class="quick-block">
+        <div class="quick-read"><span>Hit points</span><b id="q-hp"></b><span id="q-temp" class="fine"></span></div>
+        <div class="hp-controls">
+          <input type="text" inputmode="numeric" value="1" aria-label="Amount" autocomplete="off">
+          <button type="button" class="btn danger" data-action="hp" data-dir="damage">Damage</button>
+          <button type="button" class="btn" data-action="hp" data-dir="heal">Heal</button>
+          <button type="button" class="btn" data-action="hp" data-dir="temp">Add temp</button>
+        </div>
+        <div class="button-row"><button type="button" class="btn small quiet" data-action="hp" data-dir="clear-temp">Clear temp HP</button></div>
+      </div>
+      <div class="quick-block">
+        <div class="quick-read"><span>Focus points</span><b id="q-fp"></b></div>
+        <div class="button-row">
+          <button type="button" class="btn" data-action="fp" data-dir="-1" id="q-fp-minus">Spend 1</button>
+          <button type="button" class="btn" data-action="fp" data-dir="1" id="q-fp-plus">Regain 1</button>
+          <button type="button" class="btn quiet" data-action="fp" data-dir="reset">Refill</button>
+        </div>
+      </div>
+      <div class="button-row"><button type="button" class="btn primary" data-action="rest">Full rest</button></div>`;
+    $('#quick-body input').addEventListener('focus', e => e.target.select());
+    updateQuick();
+    const dlg = $('#quick-dialog');
+    if (!dlg.open) dlg.showModal();
+    void c;
+  }
+  function updateQuick() {
+    const q = $('#q-hp');
+    if (!q) return;
+    const c = active();
+    q.textContent = `${c.currentHP} of ${c.maxHP}`;
+    $('#q-temp').textContent = c.tempHP ? `+${c.tempHP} temp` : '';
+    $('#q-fp').textContent = `${c.currentFP} of ${c.maxFP}`;
+    $('#q-fp-minus').disabled = c.currentFP <= 0;
+    $('#q-fp-plus').disabled = c.currentFP >= c.maxFP;
   }
   function updateMini() {
     $('#vitals-mini').hidden = !(state.tab === 'my-spells' && !state.vitalsVisible && !state.vPinned);
@@ -357,7 +397,7 @@
     v.classList.toggle('pinned', state.vPinned);
     const c = $('#vitals-collapse');
     c.setAttribute('aria-pressed', String(state.vCompact));
-    c.textContent = state.vCompact ? 'Show details' : 'Compact view';
+    c.textContent = state.vCompact ? 'Show everything' : 'Modifiers only';
     const p = $('#vitals-pin');
     p.setAttribute('aria-pressed', String(state.vPinned));
     p.textContent = state.vPinned ? 'Pinned to top' : 'Pin to top';
@@ -369,14 +409,16 @@
     persist();
     updateVitals();
   }
-  function hpAmount() {
-    const n = parseNum($('#hp-amount').value);
+  function hpAmount(el) {
+    const box = el && el.closest ? el.closest('.hp-controls') : null;
+    const input = box ? $('input', box) : $('#hp-amount');
+    const n = parseNum(input.value);
     return Number.isFinite(n) && n > 0 ? Math.min(n, 999) : 1;
   }
-  function hpAction(dir) {
+  function hpAction(dir, el) {
     const c = active();
     const before = { hp: c.currentHP, temp: c.tempHP };
-    const amt = hpAmount();
+    const amt = hpAmount(el);
     let msg;
     if (dir === 'damage') {
       let left = amt;
@@ -677,7 +719,7 @@
     const tags = [];
     if (v.type) tags.push(`<span class="tag">${esc(v.type)}</span>`);
     if (v.rarity) tags.push(`<span class="tag ${esc(v.rarityKey)}">${esc(v.rarity)}</span>`);
-    if (v.equippable) tags.push(`<span class="tag">Slot: ${esc(v.slot)}</span>`);
+    if (v.equippable) tags.push(`<span class="tag">${e.slots.length ? `Worn: ${esc(e.slots.join(' + '))}` : `Slot: ${esc(v.slot)}`}</span>`);
     if (v.consumable) tags.push('<span class="tag">Consumable</span>');
     const showQty = !v.equippable && !e.equipped;
     const facts = v.extras.length
@@ -712,6 +754,8 @@
 
   function renderItems() {
     const c = active();
+    fixLegacyEquipped(c);
+    renderSlotGrid();
     const box = $('#items-list');
     const toks = tokens(state.itemSearch);
     if (!c.inventory.length) {
@@ -731,6 +775,61 @@
     box.innerHTML = section('Equipped', equipped) + section('Carried', carried);
   }
 
+  // ---- equip slots
+  const entrySlot = e => entryView(e).slot;
+  // Old saves only said "equipped". Give those items a slot now that the item list is known.
+  function fixLegacyEquipped(c) {
+    let changed = false;
+    c.inventory.forEach(e => {
+      if (!e.equipped || e.slots.length) return;
+      const req = HH.slots.needs(entrySlot(e));
+      const res = req ? HH.slots.place(req, HH.slots.occupancy(c.inventory)) : null;
+      if (res && !res.displaced.length) e.slots = res.slots; else e.equipped = false;
+      changed = true;
+    });
+    if (changed) persist();
+  }
+  function equipToggle(e) {
+    const c = active();
+    if (e.slots.length) {
+      const was = e.slots.slice();
+      e.slots = []; e.equipped = false;
+      persist();
+      toast(`Took off ${entryView(e).name}.`, () => { e.slots = was; e.equipped = true; persist(); renderItems(); });
+      return;
+    }
+    const req = HH.slots.needs(entrySlot(e));
+    if (!req) { toast('This item has no slot to equip into.'); return; }
+    const res = HH.slots.place(req, HH.slots.occupancy(c.inventory));
+    const swapped = res.displaced.map(uid => findEntry(uid)).filter(Boolean);
+    const before = swapped.map(x => ({ x, slots: x.slots.slice() }));
+    swapped.forEach(x => { x.slots = []; x.equipped = false; });
+    e.slots = res.slots; e.equipped = true;
+    persist();
+    const name = entryView(e).name;
+    if (swapped.length) {
+      toast(`Equipped ${name} in ${res.slots.join(' and ')}, replacing ${swapped.map(x => entryView(x).name).join(' and ')}.`, () => {
+        e.slots = []; e.equipped = false;
+        before.forEach(b => { b.x.slots = b.slots; b.x.equipped = true; });
+        persist(); renderItems();
+      });
+    } else {
+      toast(`Equipped ${name} in ${res.slots.join(' and ')}.`);
+    }
+  }
+  function renderSlotGrid() {
+    const c = active();
+    const occ = HH.slots.occupancy(c.inventory);
+    $('#slot-grid').innerHTML = HH.slots.visibleSlots(c.inventory).map(slot => {
+      const uid = occ.get(slot);
+      const e = uid ? findEntry(uid) : null;
+      if (!e) return `<div class="slot"><span class="slot-label">${esc(slot)}</span><span class="slot-empty">Empty</span></div>`;
+      const also = e.slots.filter(s => s !== slot);
+      return `<div class="slot filled"><span class="slot-label">${esc(slot)}</span>
+        <span class="slot-item">${esc(entryView(e).name)}</span>${also.length ? `<span class="fine">also ${esc(also.join(', '))}</span>` : ''}
+        <button type="button" class="btn small quiet" data-action="item-equip" data-uid="${esc(e.uid)}" aria-label="Take off ${esc(entryView(e).name)}">Take off</button></div>`;
+    }).join('');
+  }
   function findEntry(uid) { return active().inventory.find(e => e.uid === uid); }
 
   function addCatalogItem(item) {
@@ -739,7 +838,7 @@
       const existing = c.inventory.find(e => e.itemId === item.id);
       if (existing) { existing.qty = Math.min(999, existing.qty + 1); persist(); return; }
     }
-    c.inventory.push({ uid: HH.storage.uid(), itemId: item.id, name: item.name, qty: 1, equipped: false, custom: null });
+    c.inventory.push({ uid: HH.storage.uid(), itemId: item.id, name: item.name, qty: 1, equipped: false, slots: [], custom: null });
     persist();
   }
 
@@ -903,7 +1002,7 @@
       </div>`).join('');
     $('#core-grid').innerHTML = C.CORE_STATS.map(k => `
       <div class="field" data-row="${k}">
-        <label for="stat-${k}">${esc(C.STAT_NAMES[k])}</label>
+        <label for="stat-${k}">${esc(C.STAT_NAMES[k])} <span class="mod" data-mod="${k}"></span></label>
         <div class="stepper">
           <button type="button" class="step" data-action="step" data-stat="${k}" data-delta="-1" aria-label="Lower ${esc(C.STAT_NAMES[k])}">&minus;</button>
           <input id="stat-${k}" type="text" inputmode="numeric" pattern="[0-9]*" data-stat="${k}" autocomplete="off">
@@ -921,10 +1020,75 @@
       </div>`).join('');
     $('#health-fields').innerHTML = fieldHTML('health');
     $('#number-fields').innerHTML = fieldHTML('numbers');
+    $('#sheet-stats').innerHTML = fieldHTML('sheet') +
+      '<p class="fine derived" id="sheet-derived"></p>';
+    buildSheetRows();
     $('#char-hall').innerHTML = '<option value="">None</option>' + C.HALLS.map(h => `<option>${esc(h)}</option>`).join('');
     $('#new-tag-color').innerHTML = colorOptions('sky');
   }
 
+  const STAT_ABBR = { str: 'STR', dex: 'DEX', con: 'CON', int: 'INT', wis: 'WIS', cha: 'CHA' };
+  const PROF_MARK = ['\u25cb', '\u25cf', '\u25c9'];
+  const PROF_WORD = ['not proficient', 'proficient', 'double proficiency'];
+  function sheetRow(kind, key, label, stat) {
+    return `<div class="sheet-row" data-kind="${kind}" data-key="${key}">
+      <button type="button" class="prof" data-action="prof-cycle" data-kind="${kind}" data-key="${key}"></button>
+      <span class="sheet-name">${esc(label)}${kind === 'skill' ? ` <span class="fine">${STAT_ABBR[stat]}</span>` : ''}</span>
+      <input type="text" inputmode="numeric" data-override="${kind}" data-key="${key}" aria-label="${esc(label)} total" autocomplete="off">
+    </div>`;
+  }
+  function buildSheetRows() {
+    $('#sheet-saves').innerHTML = C.CORE_STATS.map(k => sheetRow('save', k, `${C.STAT_NAMES[k]} save`, k)).join('');
+    $('#sheet-skills').innerHTML = C.SKILLS.map(s => sheetRow('skill', s.key, s.label, s.stat)).join('');
+  }
+  function updateSheet() {
+    const c = active();
+    const S = HH.sheet;
+    C.CORE_STATS.forEach(k => {
+      const m = $(`[data-mod="${k}"]`);
+      if (m) m.textContent = S.fmt(S.mod(c.stats[k]));
+    });
+    const paint = (kind, key, label, t, level) => {
+      const row = $(`.sheet-row[data-kind="${kind}"][data-key="${key}"]`);
+      if (!row) return;
+      const btn = $('.prof', row);
+      btn.textContent = PROF_MARK[level || 0];
+      btn.setAttribute('aria-label', `${label}: ${PROF_WORD[level || 0]}. Tap to change.`);
+      btn.dataset.level = level || 0;
+      const input = $('input', row);
+      if (document.activeElement !== input) input.value = t.total;
+      row.classList.toggle('overridden', t.overridden);
+      input.title = t.overridden ? `Typed in. Automatic would be ${t.auto}. Clear the box to go back.` : '';
+    };
+    C.CORE_STATS.forEach(k => paint('save', k, `${C.STAT_NAMES[k]} save`, S.saveTotal(c, k), c.saveProf[k]));
+    C.SKILLS.forEach(s => paint('skill', s.key, s.label, S.skillTotal(c, s), c.skillProf[s.key]));
+    const d = $('#sheet-derived');
+    if (d) d.textContent = `Proficiency bonus ${S.fmt(S.profValue(c))}${c.profOverride == null ? ` (from level ${c.level})` : ' (typed in)'}. Initiative ${S.fmt(S.initiative(c))}.`;
+  }
+  function setOverride(kind, key, raw) {
+    const c = active();
+    const S = HH.sheet;
+    const bag = kind === 'save' ? c.saveOverride : c.skillOverride;
+    const text = String(raw).trim();
+    const n = parseNum(text);
+    const skill = kind === 'skill' ? C.SKILLS.find(s => s.key === key) : null;
+    const auto = kind === 'save' ? S.saveTotal(c, key).auto : S.skillTotal(c, skill).auto;
+    if (text === '' || !Number.isFinite(n) || n === auto) delete bag[key];
+    else bag[key] = clamp(n, [-30, 60]);
+    persist();
+    updateSheet();
+  }
+  function renderCombat() {
+    const c = active();
+    $('#combat-rows').innerHTML = c.combat.length ? c.combat.map(r => `
+      <div class="combat-row" data-id="${esc(r.id)}">
+        <div class="field"><label>Item or attack</label><input type="text" data-combat="item" maxlength="80" value="${esc(r.item)}" autocomplete="off"></div>
+        <div class="field"><label>Attack bonus</label><input type="text" data-combat="atk" maxlength="20" value="${esc(r.atk)}" autocomplete="off"></div>
+        <div class="field"><label>Damage and type</label><input type="text" data-combat="dmg" maxlength="40" value="${esc(r.dmg)}" autocomplete="off"></div>
+        <div class="field"><label>Other</label><input type="text" data-combat="other" maxlength="120" value="${esc(r.other)}" autocomplete="off"></div>
+        <button type="button" class="btn small quiet" data-action="combat-remove" data-id="${esc(r.id)}">Remove</button>
+      </div>`).join('') : '<p class="fine">No attacks listed yet.</p>';
+  }
   function updateStatRow(key) {
     const c = active();
     const isEl = C.ELEMENTS.includes(key);
@@ -936,6 +1100,7 @@
     minus.disabled = value <= range[0];
     plus.disabled = value >= range[1];
     if (isEl) $$('.meter i', row).forEach((seg, i) => seg.classList.toggle('on', i < value));
+    if (!isEl) updateSheet();
   }
   function updateField(key) {
     const c = active();
@@ -966,6 +1131,9 @@
     hall.value = c.hall;
     [...C.ELEMENTS, ...C.CORE_STATS].forEach(updateStatRow);
     Object.keys(C.NUMBER_FIELDS).forEach(updateField);
+    $$('[data-sheet]').forEach(el => { el.value = c[el.dataset.sheet] || ''; });
+    renderCombat();
+    updateSheet();
     updateSummary();
   }
   function setStat(key, raw) {
@@ -1001,6 +1169,7 @@
     persist();
     updateField(key);
     updateVitals();
+    updateSheet();
   }
 
   // ------------------------------------------------------------ header
@@ -1008,7 +1177,7 @@
     const c = active();
     const sel = $('#char-switch');
     sel.innerHTML = state.store.characters.map(x => `<option value="${esc(x.id)}"${x.id === c.id ? ' selected' : ''}>${esc(x.name || 'Unnamed')}</option>`).join('');
-    $('#who-sub').innerHTML = `<span>Level ${c.level}</span>${c.hall ? `<span>${esc(c.hall)}</span>` : ''}<span>HP ${c.currentHP} of ${c.maxHP}</span><span>FP ${c.currentFP} of ${c.maxFP}</span>`;
+    $('#who-sub').innerHTML = `<span>Level ${c.level}</span>${c.hall ? `<span>${esc(c.hall)}</span>` : ''}<button type="button" class="hdr-chip" data-action="open-quick" aria-label="Hit points ${c.currentHP} of ${c.maxHP}${c.tempHP ? `, plus ${c.tempHP} temporary` : ''}. Tap to change.">HP <b>${c.currentHP}/${c.maxHP}${c.tempHP ? ` +${c.tempHP}` : ''}</b></button><button type="button" class="hdr-chip" data-action="open-quick" aria-label="Focus points ${c.currentFP} of ${c.maxFP}. Tap to change.">FP <b>${c.currentFP}/${c.maxFP}</b></button>`;
     document.title = `${c.name || 'Unnamed'} - Spell Finder`;
   }
 
@@ -1202,6 +1371,35 @@
     'dismiss-banner': el => { dropBanners(new RegExp(`^${el.dataset.id.replace(/[^\w-]/g, '')}$`)); },
     'toast-undo': () => { const fn = toastUndo; hideToast(); if (fn) fn(); },
     'to-top': () => window.scrollTo({ top: 0, behavior: 'smooth' }),
+    'open-quick': () => openQuick(),
+    'prof-cycle': el => {
+      const c = active();
+      const bag = el.dataset.kind === 'save' ? c.saveProf : c.skillProf;
+      const next = ((bag[el.dataset.key] || 0) + 1) % 3;
+      if (next) bag[el.dataset.key] = next; else delete bag[el.dataset.key];
+      persist();
+      updateSheet();
+    },
+    'combat-add': () => {
+      const c = active();
+      if (c.combat.length >= (C.COMBAT_ROWS_MAX || 30)) { toast('That is the most rows the list holds.'); return; }
+      c.combat.push({ id: HH.storage.uid(), item: '', atk: '', dmg: '', other: '' });
+      persist();
+      renderCombat();
+      const rows = $$('#combat-rows .combat-row');
+      const last = rows[rows.length - 1];
+      if (last) $('input', last).focus();
+    },
+    'combat-remove': el => {
+      const c = active();
+      const i = c.combat.findIndex(r => r.id === el.dataset.id);
+      if (i < 0) return;
+      const [gone] = c.combat.splice(i, 1);
+      persist();
+      renderCombat();
+      toast('Removed the row.', () => { c.combat.splice(Math.min(i, c.combat.length), 0, gone); persist(); renderCombat(); });
+    },
+    'close-quick': () => $('#quick-dialog').close(),
 
     'toggle-spell': el => {
       const card = el.closest('.spell');
@@ -1252,7 +1450,7 @@
       if (dir === 'reset') setFP(c.maxFP);
       else setFP(c.currentFP + Number(dir));
     },
-    hp: el => hpAction(el.dataset.dir),
+    hp: el => hpAction(el.dataset.dir, el),
     rest: () => fullRest(),
     'vitals-collapse': () => {
       state.vCompact = !state.vCompact;
@@ -1274,7 +1472,8 @@
       const key = el.dataset.field;
       const f = C.NUMBER_FIELDS[key];
       const cur = active()[key];
-      setField(key, cur == null ? f.start : cur + Number(el.dataset.delta));
+      const start = key === 'profOverride' ? HH.sheet.profBonus(active().level) : f.start;
+      setField(key, cur == null ? start : cur + Number(el.dataset.delta));
     },
 
     'mf-panel': () => { state.mfOpen = !state.mfOpen; renderFilterPanel(); },
@@ -1359,8 +1558,7 @@
     'item-equip': el => {
       const e = findEntry(el.dataset.uid);
       if (!e) return;
-      e.equipped = !e.equipped;
-      persist();
+      equipToggle(e);
       renderItems();
       const again = $(`[data-action="item-equip"][data-uid="${CSS.escape(e.uid)}"]`);
       if (again) again.focus();
@@ -1471,7 +1669,7 @@
 
     // character fields
     $('#char-name').addEventListener('input', e => { active().name = e.target.value.slice(0, 60); persist(); renderHeader(); });
-    $('#char-level').addEventListener('change', e => { active().level = Number(e.target.value); persist(); renderHeader(); });
+    $('#char-level').addEventListener('change', e => { active().level = Number(e.target.value); persist(); renderHeader(); updateSheet(); });
     $('#char-hall').addEventListener('change', e => { active().hall = e.target.value; persist(); renderHeader(); });
     $('#char-fp').addEventListener('change', e => {
       const c = active();
@@ -1486,6 +1684,17 @@
     });
     $('#tab-character').addEventListener('focusin', e => {
       if (e.target.matches('input[data-stat], input[data-field]')) e.target.select();
+    });
+    $('#tab-character').addEventListener('input', e => {
+      const t = e.target;
+      if (t.matches('[data-sheet]')) { active()[t.dataset.sheet] = t.value; persist(); }
+      else if (t.matches('[data-combat]')) {
+        const row = active().combat.find(r => r.id === t.closest('.combat-row').dataset.id);
+        if (row) { row[t.dataset.combat] = t.value; persist(); }
+      }
+    });
+    $('#tab-character').addEventListener('change', e => {
+      if (e.target.matches('input[data-override]')) setOverride(e.target.dataset.override, e.target.dataset.key, e.target.value);
     });
     $('#char-switch').addEventListener('change', e => switchCharacter(e.target.value));
     $('#hp-amount').addEventListener('focus', e => e.target.select());
@@ -1518,7 +1727,7 @@
     $('#dialog-type').addEventListener('change', e => { state.dialogType = e.target.value; renderCatalog(); });
 
     // dialogs
-    ['item-dialog', 'tag-dialog', 'dice-dialog'].forEach(id => {
+    ['item-dialog', 'tag-dialog', 'dice-dialog', 'quick-dialog'].forEach(id => {
       const dlg = $(`#${id}`);
       dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
     });
@@ -1541,7 +1750,7 @@
       const slot = $('#custom-slot').value.trim();
       const qty = slot ? 1 : clamp(parseInt($('#custom-qty').value, 10) || 1, [1, 999]);
       active().inventory.push({
-        uid: HH.storage.uid(), itemId: null, name, qty, equipped: false,
+        uid: HH.storage.uid(), itemId: null, name, qty, equipped: false, slots: [],
         custom: { type: $('#custom-type').value.trim(), description: $('#custom-description').value.trim(), slot, consumable: $('#custom-consumable').checked },
       });
       persist();

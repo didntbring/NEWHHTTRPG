@@ -84,6 +84,27 @@
         </div>
       </div>
 
+      <div class="field-row">
+        <div class="field">
+          <label for="sheet-playerName">Player</label>
+          <input id="sheet-playerName" type="text" maxlength="60" data-sheet="playerName" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="sheet-race">Race</label>
+          <input id="sheet-race" type="text" maxlength="60" data-sheet="race" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="sheet-xp">Experience points</label>
+          <input id="sheet-xp" type="text" inputmode="numeric" maxlength="20" data-sheet="xp" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="group">
+        <h3>Defense and movement</h3>
+        <div id="sheet-stats" class="core-grid wide"></div>
+        <p class="fine">Armor class isn't added up from your gear. Type the total you want shown.</p>
+      </div>
+
       <div class="group">
         <h3>Health</h3>
         <div id="health-fields" class="core-grid"></div>
@@ -104,6 +125,43 @@
       <div class="group">
         <h3>Core attributes</h3>
         <div id="core-grid" class="core-grid"></div>
+      </div>
+
+      <details class="group fold" id="fold-saves" open>
+        <summary><h3>Saving throws</h3></summary>
+        <p class="fine">Tap the circle to cycle: not proficient, proficient, double proficiency. Type a number in a total to override it; clear the box to go back to automatic.</p>
+        <div id="sheet-saves" class="sheet-rows"></div>
+      </details>
+
+      <details class="group fold" id="fold-skills">
+        <summary><h3>Skills</h3></summary>
+        <div id="sheet-skills" class="sheet-rows"></div>
+      </details>
+
+      <div class="group">
+        <h3>Attacks and combat</h3>
+        <div id="combat-rows"></div>
+        <button type="button" class="btn small" data-action="combat-add">Add attack or weapon</button>
+        <div class="field" style="margin-top:12px">
+          <label for="sheet-combatNotes">Combat notes</label>
+          <textarea id="sheet-combatNotes" rows="3" maxlength="4000" data-sheet="combatNotes"></textarea>
+        </div>
+      </div>
+
+      <div class="group">
+        <h3>Notes</h3>
+        <div class="field">
+          <label for="sheet-background">Background information</label>
+          <textarea id="sheet-background" rows="5" maxlength="4000" data-sheet="background"></textarea>
+        </div>
+        <div class="field">
+          <label for="sheet-classInfo">Class information</label>
+          <textarea id="sheet-classInfo" rows="5" maxlength="4000" data-sheet="classInfo"></textarea>
+        </div>
+        <div class="field">
+          <label for="sheet-otherNotes">Other notes</label>
+          <textarea id="sheet-otherNotes" rows="5" maxlength="4000" data-sheet="otherNotes"></textarea>
+        </div>
       </div>
 
       <p id="char-summary" class="summary"></p>
@@ -227,6 +285,10 @@
       <div class="panel-head">
         <h2>Items</h2>
         <button type="button" class="btn primary" id="open-item-dialog" data-action="open-item-dialog">Add item</button>
+      </div>
+      <div class="group slots-group">
+        <h3>Worn and held</h3>
+        <div id="slot-grid" class="slot-grid"></div>
       </div>
       <div class="filters">
         <input id="item-search" type="search" placeholder="Search my items" aria-label="Search my items" autocomplete="off">
@@ -354,6 +416,14 @@
   </dialog>
 
   <!-- =========================== Dice dialog =========================== -->
+  <dialog id="quick-dialog" aria-labelledby="quick-title">
+    <div class="dialog-head">
+      <h2 id="quick-title">Health and focus</h2>
+      <button type="button" class="btn small" data-action="close-quick">Done</button>
+    </div>
+    <div id="quick-body"></div>
+  </dialog>
+
   <dialog id="dice-dialog" aria-labelledby="dice-title">
     <div class="dialog-head">
       <h2 id="dice-title">Dice</h2>
@@ -391,6 +461,8 @@
   <script src="catalog.js"></script>
   <script src="dice.js"></script>
   <script src="logic.js"></script>
+  <script src="slots.js"></script>
+  <script src="sheet.js"></script>
   <script src="storage.js"></script>
   <script src="app.js"></script>
 </body>
